@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário Scanner</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: #f4f4f9;
+        }
+        .screen {
+            width: 100%;
+            max-width: 500px;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .screen h1, .screen h2 {
+            text-align: center;
+            margin-top: 0;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        .form-group select, .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+        button {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .primary-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 15px;
+            width: 100%;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.2em;
+        }
+        .hidden {
+            display: none !important;
+        }
+        #scanner-screen {
+            text-align: center;
+        }
+        .camera-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 40px;
+            background-color: #f8f9fa;
+            border: 2px dashed #adb5bd;
+            border-radius: 8px;
+            min-width: 280px;
+            font-size: 1em;
+            margin-top: 20px;
+            color: #495057;
+        }
+        .camera-button span {
+            margin-top: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        #loading-spinner {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 40px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+        background-color: white;
+        padding: 20px 30px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        width: 90%;
+        max-width: 400px;
+        /* LINHAS ADICIONADAS */
+        max-height: 85vh; /* Define uma altura máxima (85% da altura da tela) */
+        overflow-y: auto; /* Adiciona rolagem vertical se o conteúdo ultrapassar */
+        }
+        .modal-content h2, .modal-content h3 {
+            margin-top: 0;
+        }
+        #item-barcode-display {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #007bff;
+            margin: 15px 0;
+            word-wrap: break-word;
+        }
+        .success-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1em;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .secondary-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1em;
+            border-radius: 5px;
+            margin: 5px;
+        }
+        #webcam-video {
+            max-width: 80vw;
+            max-height: 70vh;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        #camera-select {
+            width: 100%;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            margin-bottom: 15px;
+        }
+        #recount-list {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+        #recount-list li {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #recount-list li.completed {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            text-decoration: line-through;
+            cursor: not-allowed;
+        }
+        #scan-history-container {
+        margin-top: 30px;
+        border-top: 1px solid #eee;
+        padding-top: 20px;
+        width: 100%;
+        text-align: left;
+        }
+
+        #scan-history-list {
+            list-style-type: none;
+            padding: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        #scan-history-list li {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+        }
+
+        #scan-history-list li:last-child {
+            border-bottom: none;
+        }
+
+        #scan-history-list .item-details {
+            flex-grow: 1;
+        }
+
+        #scan-history-list .item-actions svg {
+        width: 20px;
+        height: 20px;
+        fill: #007bff; /* Cor do ícone */
+        cursor: pointer;
+        transition: opacity 0.2s;
+        }
+
+        /* Efeito ao passar o mouse sobre o ícone */
+        #scan-history-list .item-actions svg:hover {
+            opacity: 0.7;
+        }
+        #search-history-input {
+        width: 100%;
+        padding: 10px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 1em;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen" class="screen">
+        <h1>Contagem de Inventário</h1>
+        <div class="form-group">
+            <label for="store-select">Selecione a Loja:</label>
+            <select id="store-select">
+                <option value="">Carregando lojas...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="operator-name">Seu Nome:</label>
+            <input type="text" id="operator-name" placeholder="Digite seu nome aqui">
+        </div>
+        <button id="start-btn" class="primary-btn">Iniciar Contagem</button>
+    </div>
+
+    <div id="scanner-screen" class="screen hidden">
+        <h2>Scanner</h2>
+        <p>Escolha uma opção para escanear.</p>
+
+        <div class="form-group" style="display: flex; gap: 10px;">
+            <button id="recover-last-item-btn" class="secondary-btn" style="background-color: #6c757d; flex-grow: 1;">Recuperar Último</button>
+            <button id="manual-entry-btn" class="secondary-btn" style="background-color: #5a6268; flex-grow: 1;">Inserir Manual</button>
+        </div>
+
+    <label for="camera-input" class="camera-button hidden" id="mobile-camera-btn">
+        <span>Escanear com Câmera</span>
+    </label>
+    <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden">
+
+    <button class="camera-button hidden" id="desktop-webcam-btn">
+        <span>Usar Webcam</span>
+    </button>
+    <div id="loading-spinner" class="hidden"></div>
+
+    <div id="scan-history-container" class="hidden">
+        <h3>Itens Lidos na Sessão</h3>
+
+        <div class="form-group">
+            <input type="search" id="search-history-input" placeholder="Buscar item por nome...">
+        </div>
+
+        <ul id="scan-history-list">
+            </ul>
+    </div>
+    </div>
+    
+
+    <div id="recount-screen" class="screen hidden">
+        <h2>Recontagem</h2>
+        <p>Itens com divergência. Clique em um item para recontar.</p>
+        <ul id="recount-list"></ul>
+    </div>
+
+    <div id="item-modal" class="modal hidden">
+    <div class="modal-content">
+        <h2 id="product-name-display">Nome do Produto</h2>
+        <p id="item-barcode-display"></p>
+
+        <div class="form-group" style="text-align: left;">
+            <label for="lot-select">Selecione o Lote:</label>
+            <select id="lot-select"></select>
+        </div>
+
+        <div id="exp-date-display-group" class="form-group hidden" style="text-align: left;">
+            <label for="exp-date-display-input">Data de Validade:</label>
+            <input type="text" id="exp-date-display-input" readonly style="background-color: #e9ecef;">
+        </div>
+
+        <div id="manual-lot-fields" class="hidden">
+            <div class="form-group" style="text-align: left;">
+                <label for="manual-lot-input">Nº do Lote Manual:</label>
+                <input type="text" id="manual-lot-input">
+            </div>
+            <div class="form-group" style="text-align: left;">
+                <label for="manual-exp-date-input">Data de Validade:</label>
+                <input type="date" id="manual-exp-date-input">
+            </div>
+        </div>
+
+        <div class="form-group" style="text-align: left;">
+            <label for="quantity-input" id="quantity-label">Quantidade:</label>
+            <input type="number" id="quantity-input" placeholder="Digite a quantidade contada">
+        </div>
+
+        <button id="save-item-btn" class="success-btn">Salvar</button>
+        <button id="cancel-item-btn" class="secondary-btn">Cancelar</button>
+    </div>
+</div>
+
+    <div id="recount-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Recontar Item</h3>
+            <p id="recount-barcode-display"></p>
+            <div class="form-group" style="text-align: left;">
+                <label for="new-count-input">Nova Quantidade:</label>
+                <input type="number" id="new-count-input" placeholder="Digite a quantidade contada">
+            </div>
+            <div class="form-group" style="text-align: left;">
+                <label for="justification-input">Justificativa:</label>
+                <textarea id="justification-input" rows="3" placeholder="Ex: Encontrado em outra prateleira..."></textarea>
+            </div>
+            <button id="save-recount-btn" class="success-btn">Salvar Recontagem</button>
+            <button id="cancel-recount-btn" class="secondary-btn">Cancelar</button>
+        </div>
+    </div>
+
+    <div id="webcam-modal" class="modal hidden">
+        <div class="modal-content">
+            <video id="webcam-video" autoplay playsinline></video>
+            <select id="camera-select" class="hidden"></select>
+            <div>
+                <button id="take-photo-btn" class="success-btn">Tirar Foto</button>
+                <button id="close-webcam-btn" class="secondary-btn">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="zxing.min.js" defer></script>
+    <script src="script.js" defer></script>
+<div id="manual-entry-modal" class="modal hidden">
+    <div class="modal-content">
+        <h2>Inserção Manual de Item</h2>
+        <div class="form-group" style="text-align: left;">
+            <label for="manual-barcode-input">Código de Barras:</label>
+            <input type="text" id="manual-barcode-input" placeholder="Digite ou escaneie o código">
+        </div>
+        <div class="form-group" style="text-align: left;">
+            <label for="manual-product-name-input">Nome do Produto:</label>
+            <input type="text" id="manual-product-name-input" placeholder="Digite o nome do produto">
+        </div>
+        <div class="form-group" style="text-align: left;">
+            <label for="manual-modal-lot-input">Lote:</label>
+            <input type="text" id="manual-modal-lot-input" placeholder="Digite o número do lote">
+        </div>
+        <div class="form-group" style="text-align: left;">
+            <label for="manual-modal-exp-date-input">Data de Validade:</label>
+            <input type="date" id="manual-modal-exp-date-input">
+        </div>
+        <div class="form-group" style="text-align: left;">
+            <label for="manual-modal-quantity-input">Quantidade:</label>
+            <input type="number" id="manual-modal-quantity-input" placeholder="Digite a quantidade">
+        </div>
+        <button id="save-manual-entry-btn" class="success-btn">Salvar Item</button>
+        <button id="cancel-manual-entry-btn" class="secondary-btn">Cancelar</button>
+    </div>
+</div>
+</body>
+</html>
