@@ -7,6 +7,7 @@ let currentStore = '', currentOperator = '', webcamStream = null, currentScanned
 let itemBeingEdited = null; // Guarda os dados do item que está sendo corrigido
 let currentRecountPhase = 1;
 let currentRecountLote = null;
+let fullRecountList = [];
 
 // --- Referências aos elementos do HTML ---
 const loginScreen = document.getElementById('login-screen');
@@ -57,6 +58,9 @@ const manualModalExpDate = document.getElementById('manual-modal-exp-date-input'
 const manualModalQuantity = document.getElementById('manual-modal-quantity-input');
 const saveManualEntryBtn = document.getElementById('save-manual-entry-btn');
 const cancelManualEntryBtn = document.getElementById('cancel-manual-entry-btn');
+const recountModalTitle = document.getElementById('recountModalTitle');
+const recountModalSubtitle = document.getElementById('recountModalSubtitle');
+const searchRecountInput = document.getElementById('search-recount-input');
 
 // --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO DE IMAGEM ---
 async function processImage(imageSource) {
@@ -121,7 +125,7 @@ function onStart() {
             if (wantsToJoin) {
                 currentRecountPhase = 1; // Define a fase
                 showScreen('recount');
-                loadRecountList(selectedStore, 1); // Carrega a lista da fase 1
+                fetchRecountList(selectedStore, 1); // Carrega a lista da fase 1
             } else {
                 resetLoginButton();
             }
@@ -130,7 +134,7 @@ function onStart() {
             if (wantsToJoin) {
                 currentRecountPhase = 2; // Define a fase
                 showScreen('recount');
-                loadRecountList(selectedStore, 2); // Carrega a lista da fase 2
+                fetchRecountList(selectedStore, 2); // Carrega a lista da fase 2
             } else {
                 resetLoginButton();
             }
@@ -179,52 +183,47 @@ function fetchProductData(barcode) {
 
 // FUNÇÃO ATUALIZADA
 function openItemModal(data) {
-    productNameDisplay.textContent = data.productName || 'Produto Desconhecido';
-    barcodeDisplay.textContent = `${currentScannedBarcode} (em ${data.uom || 'UN'})`;
-    quantityLabel.textContent = `Quantidade (${data.uom || 'UN'}):`;
-    
-    currentLotsData = data.lots;
-    isValidationRequired = (data.validationRequired === "Sim");
+  productNameDisplay.textContent = data.productName || 'Produto Desconhecido';
+  barcodeDisplay.textContent = `${currentScannedBarcode} (em ${data.uom || 'UN'})`;
+  quantityLabel.textContent = `Quantidade (${data.uom || 'UN'}):`;
+  
+  // MUDANÇA CRUCIAL: Se data.lots não existir, usa uma lista vazia [].
+  currentLotsData = data.lots || []; 
+  isValidationRequired = (data.validationRequired === "Sim");
 
-    lotSelect.innerHTML = '<option value="">Selecione um lote...</option>';
-    currentLotsData.forEach(lot => {
-        const option = document.createElement('option');
-        option.value = lot.lotNumber;
-        option.textContent = lot.lotNumber; 
-        lotSelect.appendChild(option);
-    });
-    lotSelect.innerHTML += '<option value="NOT_FOUND">--- Lote não encontrado ---</option>';
+  lotSelect.innerHTML = '<option value="">Selecione um lote...</option>';
+  
+  // Agora o forEach é seguro, pois currentLotsData nunca será undefined.
+  currentLotsData.forEach(lot => {
+    const option = document.createElement('option');
+    option.value = lot.lotNumber;
+    option.textContent = lot.lotNumber; 
+    lotSelect.appendChild(option);
+  });
+  lotSelect.innerHTML += '<option value="NOT_FOUND">--- Lote não encontrado ---</option>';
 
-    // Limpa e reseta os campos
-    quantityInput.value = '';
-    manualLotInput.value = '';
-    manualExpDateInput.value = '';
-    manualLotFields.classList.add('hidden');
-    expDateDisplayGroup.classList.add('hidden'); 
-    
-    // --- LÓGICA DE PRÉ-PREENCHIMENTO COM A CORREÇÃO ---
-    if (itemBeingEdited) {
-        // CORREÇÃO APLICADA AQUI: Converte .lot para String antes de usar .startsWith
-        if (String(itemBeingEdited.lot).startsWith('(MANUAL)')) {
-            lotSelect.value = 'NOT_FOUND';
-            const manualData = itemBeingEdited.lot.replace('(MANUAL) ', '').split(' | Val: ');
-            manualLotInput.value = manualData[0] || '';
-            manualExpDateInput.value = manualData[1] || '';
-        } else {
-            // Garante que o valor a ser selecionado também seja uma string
-            lotSelect.value = String(itemBeingEdited.lot);
-        }
-        
-        quantityInput.value = itemBeingEdited.quantity;
-        
-        // Dispara o evento 'change' manualmente para atualizar a interface
-        lotSelect.dispatchEvent(new Event('change'));
-
-        // Limpa a variável para que a próxima abertura de modal seja normal
-        itemBeingEdited = null; 
+  // Limpa e reseta os campos
+  quantityInput.value = '';
+  manualLotInput.value = '';
+  manualExpDateInput.value = '';
+  manualLotFields.classList.add('hidden');
+  expDateDisplayGroup.classList.add('hidden'); 
+  
+  if (itemBeingEdited) {
+    if (String(itemBeingEdited.lot).startsWith('(MANUAL)')) {
+      lotSelect.value = 'NOT_FOUND';
+      const manualData = itemBeingEdited.lot.replace('(MANUAL) ', '').split(' | Val: ');
+      manualLotInput.value = manualData[0] || '';
+      manualExpDateInput.value = manualData[1] || '';
+    } else {
+      lotSelect.value = String(itemBeingEdited.lot);
     }
-    
-    itemModal.classList.remove('hidden');
+    quantityInput.value = itemBeingEdited.quantity;
+    lotSelect.dispatchEvent(new Event('change'));
+    itemBeingEdited = null; 
+  }
+  
+  itemModal.classList.remove('hidden');
 }
 
 function saveData(dataPayload) {
@@ -344,27 +343,37 @@ function editHistoryItem(index) {
     }
 }
 
-function loadRecountList(storeName, phase) {
-    recountList.innerHTML = '<li>Carregando lista...</li>';
-    const action = (phase === 2) ? 'getRecountList2' : 'getRecountList';
-    const fetchUrl = `${GOOGLE_SCRIPT_URL}?action=${action}&store=${encodeURIComponent(storeName)}`;
+function fetchRecountList(storeName, phase) {
+  recountList.innerHTML = '<li>Carregando lista...</li>';
+  const action = (phase === 2) ? 'getRecountList2' : 'getRecountList';
+  const fetchUrl = `${GOOGLE_SCRIPT_URL}?action=${action}&store=${encodeURIComponent(storeName)}`;
 
-    fetch(fetchUrl).then(response => response.json()).then(items => {
-        recountList.innerHTML = '';
-        if (items.length === 0) { /* ... (código para lista vazia) ... */ }
-        items.forEach(item => {
-            const li = document.createElement('li');
-            // <<< NOVO: Exibe o nome do produto e o lote
-            li.innerHTML = `<b>${item.productName}</b><br><small>Lote: ${item.lote}</small>`;
-            li.dataset.barcode = item.barcode;
-            li.dataset.lote = item.lote; // <<< NOVO: Guarda o lote no elemento
-            li.addEventListener('click', () => {
-                // Passa o código de barras e o lote para o modal
-                openRecountModal(item.barcode, item.lote, item.productName); 
-            });
-            recountList.appendChild(li);
-        });
-    }).catch(error => { /* ... (código de erro) ... */ });
+  fetch(fetchUrl).then(response => response.json()).then(items => {
+    fullRecountList = items; // Armazena a lista completa na variável global
+    renderRecountList(fullRecountList); // Desenha a lista completa pela primeira vez
+  }).catch(error => {
+    console.error("Erro ao carregar lista de recontagem:", error);
+    recountList.innerHTML = '<li>Erro ao carregar a lista.</li>';
+  });
+}
+
+// NOVA FUNÇÃO 2: Apenas desenha a lista que recebe como parâmetro
+function renderRecountList(itemsToRender) {
+  recountList.innerHTML = '';
+  if (itemsToRender.length === 0) {
+    recountList.innerHTML = '<li>Nenhum item encontrado.</li>';
+    return;
+  }
+  itemsToRender.forEach(item => {
+    const li = document.createElement('li');
+    li.innerHTML = `<b>${item.productName}</b><br><small>Lote: ${item.lote}</small>`;
+    li.dataset.barcode = item.barcode;
+    li.dataset.lote = item.lote;
+    li.addEventListener('click', () => {
+      openRecountModal(item.barcode, item.lote, item.productName);
+    });
+    recountList.appendChild(li);
+  });
 }
 
 function openRecountModal(barcode, lote, productName) { // <<< NOVO: Recebe lote e productName
@@ -672,6 +681,17 @@ saveManualEntryBtn.addEventListener('click', () => {
     
     // Fecha o modal após o salvamento (a função saveData já lida com o feedback)
     manualEntryModal.classList.add('hidden');
+});
+searchRecountInput.addEventListener('keyup', () => {
+  const searchTerm = searchRecountInput.value.toLowerCase();
+
+  // Filtra a lista principal de recontagem
+  const filteredList = fullRecountList.filter(item => {
+    return item.productName.toLowerCase().includes(searchTerm);
+  });
+
+  // Chama a função de renderização passando apenas a lista filtrada
+  renderRecountList(filteredList);
 });
 // --- INICIA O APLICATIVO ---
 fetchStoreList();
