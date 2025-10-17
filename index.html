@@ -289,6 +289,10 @@
     <div id="recount-screen" class="screen hidden">
         <h2>Recontagem</h2>
         <p>Itens com divergência. Clique em um item para recontar.</p>
+
+        <div class="form-group">
+            <input type="search" id="search-recount-input" placeholder="Buscar item por nome...">
+        </div>
         <ul id="recount-list"></ul>
     </div>
 
@@ -323,15 +327,16 @@
             <input type="number" id="quantity-input" placeholder="Digite a quantidade contada">
         </div>
 
-        <button id="save-item-btn" class="success-btn">Salvar</button>
         <button id="cancel-item-btn" class="secondary-btn">Cancelar</button>
+        <button id="save-item-btn" class="success-btn">Salvar</button>
     </div>
 </div>
 
     <div id="recount-modal" class="modal hidden">
         <div class="modal-content">
-            <h3>Recontar Item</h3>
-            <p id="recount-barcode-display"></p>
+            <h3 id="recountModalTitle">Recontar Item</h3>
+            <p id="recountModalSubtitle">Lote e Código de Barras</p>
+        
             <div class="form-group" style="text-align: left;">
                 <label for="new-count-input">Nova Quantidade:</label>
                 <input type="number" id="new-count-input" placeholder="Digite a quantidade contada">
@@ -340,8 +345,8 @@
                 <label for="justification-input">Justificativa:</label>
                 <textarea id="justification-input" rows="3" placeholder="Ex: Encontrado em outra prateleira..."></textarea>
             </div>
-            <button id="save-recount-btn" class="success-btn">Salvar Recontagem</button>
             <button id="cancel-recount-btn" class="secondary-btn">Cancelar</button>
+            <button id="save-recount-btn" class="success-btn">Salvar Recontagem</button>
         </div>
     </div>
 
@@ -358,6 +363,7 @@
 
     <script src="zxing.min.js" defer></script>
     <script src="script.js" defer></script>
+
 <div id="manual-entry-modal" class="modal hidden">
     <div class="modal-content">
         <h2>Inserção Manual de Item</h2>
@@ -381,8 +387,8 @@
             <label for="manual-modal-quantity-input">Quantidade:</label>
             <input type="number" id="manual-modal-quantity-input" placeholder="Digite a quantidade">
         </div>
-        <button id="save-manual-entry-btn" class="success-btn">Salvar Item</button>
         <button id="cancel-manual-entry-btn" class="secondary-btn">Cancelar</button>
+        <button id="save-manual-entry-btn" class="success-btn">Salvar Item</button>
     </div>
 </div>
 </body>
