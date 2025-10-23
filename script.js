@@ -65,50 +65,93 @@ const searchRecountInput = document.getElementById('search-recount-input');
 // --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO DE IMAGEM ---
 async function processImage(imageSource) {
   showLoading(true);
+  
+  // Variável para guardar a imagem final a ser processada (original ou convertida)
+  let imageToProcess = imageSource; 
+  
+  // --- VERIFICAÇÃO E CONVERSÃO HEIC ---
+  if (imageSource && (imageSource.type.startsWith('image/heic') || imageSource.type.startsWith('image/heif'))) {
+      console.log("Formato HEIC/HEIF detectado. Iniciando conversão para JPEG...");
+      try {
+          // Usa a biblioteca heic2any para converter
+          const convertedBlob = await heic2any({
+              blob: imageSource,
+              toType: "image/jpeg", // Converte para JPEG
+              quality: 0.8,         // Qualidade da conversão (0 a 1)
+          });
+          console.log("Conversão HEIC para JPEG bem-sucedida.");
+          imageToProcess = convertedBlob; // Define a imagem convertida como a que será processada
+      } catch (conversionError) {
+          console.error("Falha na conversão HEIC:", conversionError);
+          alert("Ocorreu um erro ao converter a imagem HEIC capturada. Tente novamente ou use o formato 'Mais Compatível' na câmera.");
+          showLoading(false);
+          return; // Aborta o processamento se a conversão falhar
+      }
+  }
+
+  // --- CONTINUA COM O PROCESSAMENTO DA IMAGEM (original ou convertida) ---
   const tempImage = document.createElement('img');
   tempImage.id = 'temp-scan-image';
+  tempImage.style.display = 'none';
+  document.body.appendChild(tempImage);
   
-  // --- INÍCIO DAS LINHAS DE DIAGNÓSTICO ---
-  // Torna a imagem visível para debug
-  tempImage.style.display = 'block'; 
-  tempImage.style.maxWidth = '80%'; // Limita o tamanho para caber na tela
-  tempImage.style.margin = '20px auto'; // Centraliza
-  tempImage.style.border = '2px solid red'; // Borda para destacar
-  document.body.insertBefore(tempImage, document.body.firstChild); // Adiciona no topo do body
-  alert("Imagem capturada. Verifique se ela aparece claramente abaixo antes de clicar OK para processar.");
-  // --- FIM DAS LINHAS DE DIAGNÓSTICO ---
-
   try {
+      // Cria a URL para a imagem (agora garantido ser JPEG ou outro formato compatível)
+      const imageUrl = URL.createObjectURL(imageToProcess);
+      
       await new Promise((resolve, reject) => {
           tempImage.onload = resolve;
           tempImage.onerror = (err) => { 
-            // Erro específico se a imagem nem carregar
-            alert("ERRO CRÍTICO: O navegador não conseguiu carregar a imagem capturada. Problema de formato ou corrupção.\nDetalhe: " + JSON.stringify(err));
+            console.error("Erro ao carregar imagem para processamento:", err);
+            alert("ERRO: O navegador não conseguiu carregar a imagem para processamento.");
             showLoading(false);
             reject(err); 
           };
-          tempImage.src = URL.createObjectURL(imageSource);
+          tempImage.src = imageUrl;
       });
       
-      // ... (resto do código que tenta ler o barcode) ...
-      // Você pode comentar temporariamente a parte que chama o ZXing se quiser apenas testar a exibição da imagem
+      // Libera a memória da URL criada
+      URL.revokeObjectURL(imageUrl); 
 
-      // Exemplo comentando a leitura para focar na exibição:
-       let barcodeValue = null; 
-       /* DESCOMENTE AS LINHAS ABAIXO DEPOIS DE VERIFICAR A IMAGEM
-       if ('BarcodeDetector' in window) { ... } 
-       else { ... } 
-       if (barcodeValue) { ... } 
-       else { ... }
-       */
-       alert("Simulação de processamento concluída (leitura comentada)."); // Mensagem temporária
-       showLoading(false); // Para o spinner
+      let barcodeValue = null;
+      // Tenta BarcodeDetector (Plano A)
+      if ('BarcodeDetector' in window) {
+          const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'code_128'] });
+          try { 
+            const barcodes = await barcodeDetector.detect(tempImage);
+            if (barcodes.length > 0) { 
+              barcodeValue = barcodes[0].rawValue; 
+            } else { console.log("BarcodeDetector ran but found no barcodes. Falling back to ZXing."); }
+          } catch (detectorError) { console.error("BarcodeDetector failed:", detectorError); console.log("Falling back to ZXing..."); }
+      } 
       
-  } catch (err) {
-      // ... (código do catch) ...
+      // Tenta ZXing (Plano B) se o Plano A falhou
+      if (barcodeValue === null) { 
+          console.log("Attempting fallback with ZXing..."); 
+          const hints = new Map();
+          const formats = [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.CODE_128];
+          hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+          hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+          const codeReader = new ZXing.BrowserMultiFormatReader(hints);
+          try { 
+             const result = await codeReader.decodeFromImage(tempImage.id); 
+             barcodeValue = result.getText();
+          } catch(zxingError) { console.error("ZXing failed:", zxingError); }
+      }
+      
+      // Processa o resultado
+      if (barcodeValue) {
+          fetchProductData(barcodeValue);
+      } else {
+          alert('Nenhum código de barras foi encontrado na imagem. Verifique a iluminação, foco e enquadramento.'); 
+          showLoading(false);
+      }
+  } catch (err) { // Catch para erros inesperados
+      console.error("Erro geral no processamento da imagem:", err);
+      alert('Ocorreu um erro inesperado ao processar a imagem.\nDetalhe: ' + err.message); 
+      showLoading(false);
   } finally {
       cameraInput.value = '';
-      // Remove a imagem de debug após o processamento (ou erro)
       if (document.getElementById('temp-scan-image')) {
         document.body.removeChild(tempImage);
       }
