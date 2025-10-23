@@ -64,46 +64,55 @@ const searchRecountInput = document.getElementById('search-recount-input');
 
 // --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO DE IMAGEM ---
 async function processImage(imageSource) {
-    showLoading(true);
-    const tempImage = document.createElement('img');
-    tempImage.id = 'temp-scan-image';
-    tempImage.style.display = 'none';
-    document.body.appendChild(tempImage);
-    try {
-        await new Promise((resolve, reject) => {
-            tempImage.onload = resolve;
-            tempImage.onerror = reject;
-            tempImage.src = URL.createObjectURL(imageSource);
-        });
-        let barcodeValue = null;
-        if ('BarcodeDetector' in window) {
-            const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'code_128'] });
-            const barcodes = await barcodeDetector.detect(tempImage);
-            if (barcodes.length > 0) { barcodeValue = barcodes[0].rawValue; }
-        } else {
-            const hints = new Map();
-            const formats = [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.CODE_128];
-            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-            hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-            const codeReader = new ZXing.BrowserMultiFormatReader(hints);
-            const result = await codeReader.decodeFromImage(tempImage.id);
-            barcodeValue = result.getText();
-        }
-        if (barcodeValue) {
-            fetchProductData(barcodeValue);
-        } else {
-            alert('Nenhum código de barras foi encontrado na imagem.');
+  showLoading(true);
+  const tempImage = document.createElement('img');
+  tempImage.id = 'temp-scan-image';
+  
+  // --- INÍCIO DAS LINHAS DE DIAGNÓSTICO ---
+  // Torna a imagem visível para debug
+  tempImage.style.display = 'block'; 
+  tempImage.style.maxWidth = '80%'; // Limita o tamanho para caber na tela
+  tempImage.style.margin = '20px auto'; // Centraliza
+  tempImage.style.border = '2px solid red'; // Borda para destacar
+  document.body.insertBefore(tempImage, document.body.firstChild); // Adiciona no topo do body
+  alert("Imagem capturada. Verifique se ela aparece claramente abaixo antes de clicar OK para processar.");
+  // --- FIM DAS LINHAS DE DIAGNÓSTICO ---
+
+  try {
+      await new Promise((resolve, reject) => {
+          tempImage.onload = resolve;
+          tempImage.onerror = (err) => { 
+            // Erro específico se a imagem nem carregar
+            alert("ERRO CRÍTICO: O navegador não conseguiu carregar a imagem capturada. Problema de formato ou corrupção.\nDetalhe: " + JSON.stringify(err));
             showLoading(false);
-        }
-    } catch (err) {
-        console.error("Erro detalhado no processamento:", err);
-        // MUDANÇA CRUCIAL: Mostra a mensagem de erro técnica real
-        alert('Erro detalhado: ' + err.message + '\n\nStack: ' + err.stack);
-        showLoading(false);
-    } finally {
-        cameraInput.value = '';
+            reject(err); 
+          };
+          tempImage.src = URL.createObjectURL(imageSource);
+      });
+      
+      // ... (resto do código que tenta ler o barcode) ...
+      // Você pode comentar temporariamente a parte que chama o ZXing se quiser apenas testar a exibição da imagem
+
+      // Exemplo comentando a leitura para focar na exibição:
+       let barcodeValue = null; 
+       /* DESCOMENTE AS LINHAS ABAIXO DEPOIS DE VERIFICAR A IMAGEM
+       if ('BarcodeDetector' in window) { ... } 
+       else { ... } 
+       if (barcodeValue) { ... } 
+       else { ... }
+       */
+       alert("Simulação de processamento concluída (leitura comentada)."); // Mensagem temporária
+       showLoading(false); // Para o spinner
+      
+  } catch (err) {
+      // ... (código do catch) ...
+  } finally {
+      cameraInput.value = '';
+      // Remove a imagem de debug após o processamento (ou erro)
+      if (document.getElementById('temp-scan-image')) {
         document.body.removeChild(tempImage);
-    }
+      }
+  }
 }
 
 // --- FUNÇÕES DE CONTROLE DA INTERFACE ---
