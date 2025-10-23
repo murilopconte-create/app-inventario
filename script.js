@@ -97,7 +97,8 @@ async function processImage(imageSource) {
         }
     } catch (err) {
         console.error("Erro detalhado no processamento:", err);
-        alert('Ocorreu um erro ao processar a imagem.');
+        // MUDANÇA CRUCIAL: Mostra a mensagem de erro técnica real
+        alert('Erro detalhado: ' + err.message + '\n\nStack: ' + err.stack);
         showLoading(false);
     } finally {
         cameraInput.value = '';
