@@ -61,6 +61,7 @@ const cancelManualEntryBtn = document.getElementById('cancel-manual-entry-btn');
 const recountModalTitle = document.getElementById('recountModalTitle');
 const recountModalSubtitle = document.getElementById('recountModalSubtitle');
 const searchRecountInput = document.getElementById('search-recount-input');
+const refreshRecountListBtn = document.getElementById('refresh-recount-list-btn');
 
 // --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO DE IMAGEM ---
 async function processImage(imageSource) {
@@ -220,17 +221,32 @@ function showScreen(screenName) {
 }
 
 function fetchProductData(barcode) {
-    currentScannedBarcode = barcode;
-    showLoading(true);
-    const fetchUrl = `${GOOGLE_SCRIPT_URL}?action=getProductData&barcode=${barcode}&store=${encodeURIComponent(currentStore)}`;
-    fetch(fetchUrl).then(response => response.json()).then(data => {
-        showLoading(false);
-        lastScannedData = data;
+  currentScannedBarcode = barcode;
+  showLoading(true);
+  const fetchUrl = `${GOOGLE_SCRIPT_URL}?action=getProductData&barcode=${barcode}&store=${encodeURIComponent(currentStore)}`;
+  
+  fetch(fetchUrl)
+    .then(response => response.json())
+    .then(data => {
+      showLoading(false);
+      
+      // === A LÓGICA CONDICIONAL ===
+      if (data.productName === "Produto não encontrado") {
+        // Se o backend disse que não encontrou, abre o modal manual
+        openManualEntryForNotFound(barcode); 
+      } else {
+        // Se encontrou, abre o modal normal e guarda os dados
+        lastScannedData = data; 
         openItemModal(data);
-    }).catch(error => {
-        console.error("Erro ao buscar dados do produto:", error);
-        alert("Não foi possível buscar os dados do produto. Tente novamente.");
-        showLoading(false);
+      }
+      // === FIM DA LÓGICA CONDICIONAL ===
+      
+    })
+    .catch(error => {
+      console.error("Erro ao buscar dados do produto:", error);
+      // Mantém o alerta genérico de falha na comunicação
+      alert("Não foi possível buscar os dados do produto. Verifique a conexão e tente novamente."); 
+      showLoading(false);
     });
 }
 
@@ -441,37 +457,79 @@ function openRecountModal(barcode, lote, productName) { // <<< NOVO: Recebe lote
 }
 
 function saveRecountData() {
-    const newCount = newCountInput.value;
-    const justification = justificationInput.value.trim();
-    if (newCount === '' || newCount < 0) { /* ... (validação) ... */ }
-    if (justification === '') { /* ... (validação) ... */ }
-    
-    saveRecountBtn.disabled = true;
-    saveRecountBtn.innerText = "Salvando...";
-    const action = (currentRecountPhase === 2) ? 'submitRecount2' : 'submitRecount';
-    
-    const payload = {
-        action: action,
-        store: currentStore,
-        barcode: currentRecountBarcode,
-        lote: currentRecountLote, // <<< NOVO: Envia o lote no payload
-        newCount: newCount,
-        justification: justification
-    };
-    
-    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
-        .then(response => response.json())
-        .then(data => {
-            if (data.result === 'Success') {
-                alert('Recontagem salva com sucesso!');
-                recountModal.classList.add('hidden');
-                // Marca o item como concluído
-                const li = document.querySelector(`#recount-list li[data-barcode="${currentRecountBarcode}"][data-lote="${currentRecountLote}"]`);
-                if (li) { li.classList.add('completed'); li.onclick = null; }
-            } else { throw new Error(data.message || 'Erro desconhecido'); }
-        })
-        .catch(error => { /* ... (código de erro) ... */ })
-        .finally(() => { /* ... (reset do botão) ... */ });
+  const newCount = newCountInput.value;
+  const justification = justificationInput.value.trim();
+
+  // Validação básica (ajuste conforme necessário)
+  if (newCount === '' || newCount < 0) {
+    alert("Por favor, insira uma nova quantidade válida (maior ou igual a zero).");
+    return;
+  }
+  // if (justification === '') { // Descomente se a justificativa for obrigatória
+  //   alert("Por favor, preencha a justificativa.");
+  //   return;
+  // }
+
+  // Desabilita o botão IMEDIATAMENTE
+  saveRecountBtn.disabled = true;
+  saveRecountBtn.innerText = "Salvando...";
+
+  const action = (currentRecountPhase === 2) ? 'submitRecount2' : 'submitRecount';
+
+  const payload = {
+      action: action,
+      store: currentStore,
+      barcode: currentRecountBarcode,
+      lote: currentRecountLote, // Correto, envia o lote
+      newCount: newCount,
+      justification: justification
+  };
+
+  fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { // Boa prática adicionar o header
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(response => {
+      // Verifica se a resposta HTTP foi bem-sucedida
+      if (!response.ok) {
+        throw new Error(`Erro de rede ou servidor: ${response.statusText} (${response.status})`);
+      }
+      return response.json(); // Tenta converter a resposta para JSON
+    })
+    .then(data => {
+      // Verifica se o Google Script retornou sucesso na lógica interna
+      if (data.result === 'Success') {
+        recountModal.classList.add('hidden');
+        const li = document.querySelector(`#recount-list li[data-barcode="${currentRecountBarcode}"][data-lote="${currentRecountLote}"]`);
+        if (li) {
+          li.classList.add('completed');
+          li.onclick = null;
+        }
+        // alert('Recontagem salva com sucesso!'); // Você pode remover o alert se preferir
+      } else {
+        // Lança um erro se o Google Script retornou uma mensagem de erro
+        throw new Error(data.message || 'Erro desconhecido retornado pelo script.');
+      }
+    })
+    .catch(error => {
+      // Captura QUALQUER erro que aconteceu (rede, servidor, JSON inválido, erro lançado no .then)
+      console.error("Erro ao salvar recontagem:", error);
+      alert(`Falha ao salvar a recontagem: ${error.message}\n\nTente novamente.`);
+      // O botão será reabilitado no finally
+    })
+    .finally(() => {
+      // **** ESTE É O BLOCO CRUCIAL ****
+      // Ele é executado SEMPRE, independentemente de sucesso ou erro.
+      saveRecountBtn.disabled = false;
+      saveRecountBtn.innerText = "Salvar Recontagem";
+
+      // Limpa os campos para a próxima abertura do modal
+      newCountInput.value = '';
+      justificationInput.value = '';
+    });
 }
 
 async function populateCameraList() {
@@ -568,6 +626,18 @@ function loadStoreInventory() {
             console.error("Erro ao buscar o inventário da loja:", error);
             scanHistoryList.innerHTML = '<li>Erro ao carregar contagens.</li>';
         });
+}
+
+function openManualEntryForNotFound(scannedBarcode) {
+  // Limpa os campos antes de abrir
+  manualBarcode.value = scannedBarcode || ''; // Pré-preenche o código escaneado
+  manualProductName.value = '';
+  manualModalLot.value = '';
+  manualModalExpDate.value = '';
+  manualModalQuantity.value = '';
+  
+  manualEntryModal.classList.remove('hidden');
+  manualProductName.focus(); // Foca no campo Nome do Produto, pois o código já está preenchido
 }
 
 // --- EVENTOS DE BOTÕES ---
@@ -745,6 +815,12 @@ searchRecountInput.addEventListener('keyup', () => {
 
   // Chama a função de renderização passando apenas a lista filtrada
   renderRecountList(filteredList);
+});
+refreshRecountListBtn.addEventListener('click', () => {
+    // Simplesmente chama a função que busca os dados novamente
+    fetchRecountList(currentStore, currentRecountPhase);
+    // Limpa o campo de busca, se houver algo digitado
+    searchRecountInput.value = '';
 });
 // --- INICIA O APLICATIVO ---
 fetchStoreList();
