@@ -203,7 +203,13 @@ function saveRecountData() {
   saveRecountBtn.disabled = true; saveRecountBtn.innerText = "Salvando...";
   const action = (currentRecountPhase === 2) ? 'submitRecount2' : 'submitRecount';
   const payload = { action: action, store: currentStore, barcode: currentRecountBarcode, lote: currentRecountLote, newCount: newCount, justification: justification };
-  fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } })
+
+  // --- ALTERAÇÃO AQUI: Linha 'headers' removida ---
+  fetch(GOOGLE_SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload) // Envia o JSON como string
+    // Sem o header 'Content-Type: application/json'
+  })
     .then(response => { if (!response.ok) { throw new Error(`Erro de rede ou servidor: ${response.statusText} (${response.status})`); } return response.json(); })
     .then(data => { if (data.result === 'Success') { recountModal.classList.add('hidden'); const li = document.querySelector(`#recount-list li[data-barcode="${currentRecountBarcode}"][data-lote="${currentRecountLote}"]`); if (li) { li.classList.add('completed'); li.onclick = null; } } else { throw new Error(data.message || 'Erro desconhecido retornado pelo script.'); } })
     .catch(error => { console.error("Erro ao salvar recontagem:", error); alert(`Falha ao salvar a recontagem: ${error.message}\n\nTente novamente.`); })
