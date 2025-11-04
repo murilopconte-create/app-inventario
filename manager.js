@@ -2,7 +2,7 @@
 // ======== MANAGER.JS - CÓDIGO 100% COMPLETO E CORRIGIDO ========
 //
 
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJHzqR-Sh4EQj6XDCk3kWRp2KIbKt_Hsn97gjZ0MBRI_DWsLsm2x0A4J5jYFtEx22J/exec"; // !! VERIFIQUE SE ESTA URL ESTÁ ATUALIZADA !!
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJHzqR-Sh4EQj6XDCk3kWRp2KIbKt_Hsn97gjZ0MBRI_DWsLsm2x0A4J5jYFtEx22J/exechttps://script.google.com/macros/s/AKfycbzsY6vr4eJbOZ_lzggaYQSlapWkjXk1Z7SPGs3mtYYT-Nii5v15_xvXg0ZnMGJYpXNV/exec"; // !! VERIFIQUE SE ESTA URL ESTÁ ATUALIZADA !!
 
 // --- Referências aos Elementos ---
 const storeSelect = document.getElementById('store-select-manager');

@@ -1,4 +1,4 @@
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJHzqR-Sh4EQj6XDCk3kWRp2KIbKt_Hsn97gjZ0MBRI_DWsLsm2x0A4J5jYFtEx22J/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsY6vr4eJbOZ_lzggaYQSlapWkjXk1Z7SPGs3mtYYT-Nii5v15_xvXg0ZnMGJYpXNV/exec";
 
 let currentStore = '', currentOperator = '', webcamStream = null, currentScannedBarcode = null, currentRecountBarcode = null, currentLotsData = [], isValidationRequired = false, lastScannedData = null, scanHistory = [];
 let itemBeingEdited = null;
