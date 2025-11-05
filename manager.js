@@ -9,7 +9,7 @@ let storeData = [];
 
 // --- FUNÇÕES PRINCIPAIS ---
 
-// Busca os dados das lojas e preenche o seletor
+// Busca os dados das lojas e preenche o seletor (Não mudou)
 function initializePanel() {
     const currentSelection = storeSelect.value;
     storeSelect.innerHTML = '<option value="">Carregando...</option>';
@@ -38,7 +38,7 @@ function initializePanel() {
         });
 }
 
-// Atualiza a UI do botão com base no status da loja
+// Atualiza a UI do botão com base no status da loja (Não mudou)
 function updateButtonUI(status) {
     actionButton.className = "";
     actionButton.disabled = true;
@@ -75,34 +75,59 @@ function updateButtonUI(status) {
     }
 }
 
-// Lida com cliques que apenas mudam o status
+//
+// --- FUNÇÕES ATUALIZADAS ---
+//
+
+// Lida com cliques que apenas mudam o status (Atualizado para POST)
 function handleStatusUpdate(newStatus) {
     const storeToUpdate = storeSelect.value;
-    const url = `${GOOGLE_SCRIPT_URL}?action=updateStatus&store=${encodeURIComponent(storeToUpdate)}&newStatus=${encodeURIComponent(newStatus)}`;
     
-    // Chama a função genérica de fetch
-    fetchAndUpdate(url, `O novo status da loja ${storeToUpdate} é "${newStatus}".`);
+    // 1. Criamos um objeto de dados em vez de uma URL
+    const data = {
+      action: "updateStatus",
+      store: storeToUpdate,
+      newStatus: newStatus
+    };
+    
+    // 2. Enviamos o objeto para a função fetch
+    fetchAndUpdate(data, `O novo status da loja ${storeToUpdate} é "${newStatus}".`);
 }
 
-// Lida com o clique para gerar a Recontagem 1
+// Lida com o clique para gerar a Recontagem 1 (Atualizado para POST)
 function handleGenerateRecount() {
     const storeToUpdate = storeSelect.value;
     const confirmRecount = confirm(`ATENÇÃO!\n\nIsso irá processar todos os dados contados para a loja ${storeToUpdate} e gerar a lista de recontagem.\n\nEsta ação não pode ser desfeita. Deseja continuar?`);
     if (confirmRecount) {
-        const url = `${GOOGLE_SCRIPT_URL}?action=triggerRecount&store=${encodeURIComponent(storeToUpdate)}`;
-        
-        // Chama a função genérica de fetch
-        fetchAndUpdate(url, `A recontagem para a loja ${storeToUpdate} foi gerada com sucesso!`);
+      
+        // 1. Criamos um objeto de dados em vez de uma URL
+        const data = {
+          action: "triggerRecount",
+          store: storeToUpdate
+        };
+
+        // 2. Enviamos o objeto para a função fetch
+        fetchAndUpdate(data, `A recontagem para a loja ${storeToUpdate} foi gerada com sucesso!`);
     }
 }
 
-// Função genérica de comunicação com o Google Script
-function fetchAndUpdate(url, successMessage) {
+// Função genérica de comunicação com o Google Script (Atualizado para POST)
+function fetchAndUpdate(data, successMessage) { // <--- Recebe 'data' (objeto), não 'url'
     actionButton.disabled = true;
     actionButton.innerText = "Processando...";
-    console.log("Enviando requisição para:", url);
+    console.log("Enviando requisição POST para:", data.action); // Log atualizado
 
-    fetch(url)
+    // Configurações da requisição POST
+    const fetchOptions = {
+      method: 'POST',
+      body: JSON.stringify(data), // Converte o objeto em texto JSON
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    };
+
+    // A URL é sempre a URL base, sem parâmetros
+    fetch(GOOGLE_SCRIPT_URL, fetchOptions) // <--- Envia a URL base + as opções
     .then(response => {
         if (!response.ok) {
             throw new Error(`Erro de rede: ${response.statusText}`);
@@ -111,7 +136,7 @@ function fetchAndUpdate(url, successMessage) {
     })
     .then(data => {
         if (data.result !== "Success") {
-            throw new Error(data.message || 'Erro desconhecido retornado pelo script.');
+            throw new Error(data.message || 'Erro desconheido retornado pelo script.');
         }
         alert(successMessage);
         initializePanel(); // Recarrega os status para refletir a mudança
