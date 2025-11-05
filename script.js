@@ -268,25 +268,6 @@ document.addEventListener('DOMContentLoaded', function() {
     saveRecountBtn.addEventListener('click', saveRecountData);
     recoverLastItemBtn.addEventListener('click', () => { if (lastScannedData) { openItemModal(lastScannedData); } else { alert('Nenhum item foi escaneado nesta sessão ainda.'); } });
     searchHistoryInput.addEventListener('keyup', () => { const searchTerm = searchHistoryInput.value.toLowerCase(); const filteredHistory = scanHistory.filter(item => { return item.productName.toLowerCase().includes(searchTerm); }); renderScanHistory(filteredHistory); });
-    manualBarcode.addEventListener('keydown', function(event) {
-        // Verifica se a tecla pressionada foi 'Enter'
-        if (event.key === 'Enter') {
-            event.preventDefault(); // Impede o comportamento padrão de "submit"
-            
-            const barcode = manualBarcode.value.trim();
-
-            if (barcode) {
-                // 1. Fecha o modal de entrada manual
-                manualEntryModal.classList.add('hidden');
-                
-                // 2. Chama a MESMA função que o scanner da câmera usa
-                //    Esta função já sabe exatamente o que fazer:
-                //    - Se achar, abre o modal de lotes (openItemModal)
-                //    - Se não achar, abre este modal de novo (openManualEntryForNotFound)
-                fetchProductData(barcode);
-            }
-        }
-    });
     manualEntryBtn.addEventListener('click', () => { manualBarcode.value = ''; manualProductName.value = ''; manualModalLot.value = ''; manualModalExpDate.value = ''; manualModalQuantity.value = ''; manualEntryModal.classList.remove('hidden'); manualBarcode.focus(); });
     cancelManualEntryBtn.addEventListener('click', () => { manualEntryModal.classList.add('hidden'); });
     saveManualEntryBtn.addEventListener('click', () => { const barcode = manualBarcode.value.trim(); const productName = manualProductName.value.trim(); const lot = manualModalLot.value.trim(); const expDate = manualModalExpDate.value; const quantity = manualModalQuantity.value; if (!barcode || !productName || !quantity) { alert('Por favor, preencha pelo menos o Código de Barras, Nome do Produto e Quantidade.'); return; } let lotString = lot; if (expDate) { lotString += ` | Val: ${expDate}`; } const dataToSend = { barcode: barcode, store: currentStore, operator: currentOperator, lot: lotString, quantity: quantity, entryType: 'Manual' }; saveData(dataToSend); manualEntryModal.classList.add('hidden'); });
