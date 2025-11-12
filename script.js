@@ -88,9 +88,26 @@ async function processImage(imageSource) {
       URL.revokeObjectURL(imageUrl);
       let barcodeValue = null;
       if ('BarcodeDetector' in window) {
-          const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'code_128'] });
-          try { const barcodes = await barcodeDetector.detect(tempImage); if (barcodes.length > 0) { barcodeValue = barcodes[0].rawValue; } else { console.log("BarcodeDetector ran but found no barcodes. Falling back to ZXing."); } } catch (detectorError) { console.error("BarcodeDetector failed:", detectorError); console.log("Falling back to ZXing..."); }
-      }
+          const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'code_128'] });
+          try { 
+              const barcodes = await barcodeDetector.detect(tempImage); 
+
+                // Lógica de prioridade (já que o iOS ignora os filtros):
+              const eanBarcode = barcodes.find(b => b.format === 'ean_13');
+              const code128Barcode = barcodes.find(b => b.format === 'code_128');
+
+              if (eanBarcode) {
+                  barcodeValue = eanBarcode.rawValue; // Prioridade 1: EAN-13
+              } else if (code128Barcode) {
+                  barcodeValue = code128Barcode.rawValue; // Prioridade 2: Code-128
+              } else {
+                  console.log("Nenhum EAN-13 ou Code-128 encontrado pelo Detector. Caindo para o ZXing.");
+              }
+          } catch (detectorError) { 
+              console.error("BarcodeDetector failed:", detectorError); 
+              console.log("Falling back to ZXing..."); 
+          }
+      }
       if (barcodeValue === null) {
           console.log("Attempting fallback with ZXing..."); const hints = new Map(); const formats = [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.CODE_128]; hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats); hints.set(ZXing.DecodeHintType.TRY_HARDER, true); const codeReader = new ZXing.BrowserMultiFormatReader(hints); try { const result = await codeReader.decodeFromImage(tempImage.id); barcodeValue = result.getText(); } catch(zxingError) { console.error("ZXing failed:", zxingError); }
       }
@@ -118,7 +135,7 @@ function showScreen(screenName) {
 
 function fetchProductData(barcode) {
   currentScannedBarcode = barcode; showLoading(true);
-  const fetchUrl = `${GOOGLE_SCRIPT_URL}?action=getProductData&barcode=${barcode}&store=${encodeURIComponent(currentStore)}`;
+  const fetchUrl = `${GOOGLE_SCRIPT_URL}?action=getProductData&barcode=${encodeURIComponent(barcode)}&store=${encodeURIComponent(currentStore)}`;
   fetch(fetchUrl).then(response => response.json()).then(data => {
       showLoading(false);
       if (data.productName === "Produto não encontrado") { openManualEntryForNotFound(barcode); } else { lastScannedData = data; openItemModal(data); }
