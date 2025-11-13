@@ -143,14 +143,68 @@ function fetchProductData(barcode) {
 }
 
 function openItemModal(data) {
-  productNameDisplay.textContent = data.productName || 'Produto Desconhecido'; barcodeDisplay.textContent = `${currentScannedBarcode} (em ${data.uom || 'UN'})`; quantityLabel.textContent = `Quantidade (${data.uom || 'UN'}):`;
-  currentLotsData = data.lots || []; isValidationRequired = (data.validationRequired === "Sim");
-  lotSelect.innerHTML = '<option value="">Selecione um lote...</option>';
-  currentLotsData.forEach(lot => { const option = document.createElement('option'); option.value = lot.lotNumber; option.textContent = lot.lotNumber; lotSelect.appendChild(option); });
-  lotSelect.innerHTML += '<option value="NOT_FOUND">--- Lote não encontrado ---</option>';
-  quantityInput.value = ''; manualLotInput.value = ''; manualExpDateInput.value = ''; manualLotFields.classList.add('hidden'); expDateDisplayGroup.classList.add('hidden');
-  if (itemBeingEdited) { if (String(itemBeingEdited.lot).startsWith('(MANUAL)')) { lotSelect.value = 'NOT_FOUND'; const manualData = itemBeingEdited.lot.replace('(MANUAL) ', '').split(' | Val: '); manualLotInput.value = manualData[0] || ''; manualExpDateInput.value = manualData[1] || ''; } else { lotSelect.value = String(itemBeingEdited.lot); } quantityInput.value = itemBeingEdited.quantity; lotSelect.dispatchEvent(new Event('change')); itemBeingEdited = null; }
-  itemModal.classList.remove('hidden');
+  productNameDisplay.textContent = data.productName || 'Produto Desconhecido'; 
+  barcodeDisplay.textContent = `${currentScannedBarcode} (em ${data.uom || 'UN'})`; 
+  quantityLabel.textContent = `Quantidade (${data.uom || 'UN'}):`;
+  currentLotsData = data.lots || []; 
+  isValidationRequired = (data.validationRequired === "Sim");
+
+  // --- INÍCIO DA MUDANÇA (Lote Vazio) ---
+  lotSelect.innerHTML = ''; // Limpa opções
+  
+  // Verifica se a lista de lotes está vazia OU se o único lote é uma string vazia
+  const hasNoRealLots = currentLotsData.length === 0 || (currentLotsData.length === 1 && currentLotsData[0].lotNumber.trim() === "");
+
+  if (hasNoRealLots) {
+      // Se não há lotes, esconde o seletor e pula direto para a quantidade
+      lotSelect.innerHTML = '<option value="(Sem Lote)" selected>(Sem Lote)</option>'; // Adiciona um valor padrão
+      lotSelect.classList.add('hidden'); // Esconde o dropdown
+  } else {
+      // Se há lotes reais, mostra o seletor
+      lotSelect.classList.remove('hidden'); // Garante que está visível
+      lotSelect.innerHTML = '<option value="">Selecione um lote...</option>';
+      currentLotsData.forEach(lot => { 
+          // Não adiciona lotes em branco na lista
+          if (lot.lotNumber && lot.lotNumber.trim() !== "") {
+              const option = document.createElement('option'); 
+              option.value = lot.lotNumber; 
+              option.textContent = lot.lotNumber; 
+              lotSelect.appendChild(option); 
+          }
+      });
+      lotSelect.innerHTML += '<option value="NOT_FOUND">--- Lote não encontrado ---</option>';
+  }
+  // --- FIM DA MUDANÇA ---
+
+  quantityInput.value = ''; 
+  manualLotInput.value = ''; 
+  manualExpDateInput.value = ''; 
+  manualLotFields.classList.add('hidden'); // Garante que começa escondido
+  expDateDisplayGroup.classList.add('hidden'); // Garante que começa escondido
+
+  if (itemBeingEdited) { 
+      lotSelect.classList.remove('hidden'); // Mostra o select se estiver editando
+      if (String(itemBeingEdited.lot).startsWith('(MANUAL)')) { 
+          lotSelect.value = 'NOT_FOUND'; 
+          const manualData = itemBeingEdited.lot.replace('(MANUAL) ', '').split(' | Val: '); 
+          manualLotInput.value = manualData[0] || ''; 
+          manualExpDateInput.value = manualData[1] || ''; 
+      } else if (itemBeingEdited.lot === "(Sem Lote)") { // MUDANÇA: Handle edição de item sem lote
+          lotSelect.value = "(Sem Lote)";
+          lotSelect.classList.add('hidden');
+      } else { 
+          lotSelect.value = String(itemBeingEdited.lot); 
+      } 
+      quantityInput.value = itemBeingEdited.quantity; 
+      lotSelect.dispatchEvent(new Event('change')); 
+      itemBeingEdited = null; 
+  }
+  itemModal.classList.remove('hidden');
+  
+  // Pula para quantidade se o lote não for necessário
+  if(hasNoRealLots && !itemBeingEdited) {
+      quantityInput.focus();
+  }
 }
 
 function saveData(dataPayload) {
@@ -280,7 +334,41 @@ document.addEventListener('DOMContentLoaded', function() {
     cameraSelect.addEventListener('change', () => { const selectedCameraId = cameraSelect.value; startWebcam(selectedCameraId); });
     lotSelect.addEventListener('change', () => { const selectedLotNumber = lotSelect.value; manualLotFields.classList.add('hidden'); expDateDisplayGroup.classList.add('hidden'); if (selectedLotNumber === 'NOT_FOUND') { manualLotFields.classList.remove('hidden'); } else if (selectedLotNumber) { const selectedLotData = currentLotsData.find(lot => String(lot.lotNumber) === selectedLotNumber); if (selectedLotData && selectedLotData.expDate) { const date = new Date(selectedLotData.expDate); const formattedDate = date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }); expDateDisplayInput.value = formattedDate; expDateDisplayGroup.classList.remove('hidden'); } } });
     cancelItemBtn.addEventListener('click', () => { itemModal.classList.add('hidden'); });
-    saveItemBtn.addEventListener('click', () => { const quantity = quantityInput.value; let lot = lotSelect.value; if (!quantity || parseFloat(quantity) <= 0) { alert("Por favor, insira uma quantidade válida."); return; } if (!lot) { alert("Por favor, selecione um lote."); return; } let dataToSend; if (lot === 'NOT_FOUND') { const manualLot = manualLotInput.value.trim(); const manualExpDate = manualExpDateInput.value; if (!manualLot) { alert("Por favor, insira o número do lote manual."); return; } if (isValidationRequired && !manualExpDate) { alert("Este produto exige o preenchimento da Data de Validade. Por favor, preencha o campo."); return; } let lotString = `(MANUAL) ${manualLot}`; if (manualExpDate) { lotString += ` | Val: ${manualExpDate}`; } dataToSend = { barcode: currentScannedBarcode, store: currentStore, operator: currentOperator, lot: lotString, quantity: quantity }; } else { dataToSend = { barcode: currentScannedBarcode, store: currentStore, operator: currentOperator, lot: lot, quantity: quantity }; } saveData(dataToSend); });
+    saveItemBtn.addEventListener('click', () => { 
+        const quantity = quantityInput.value; 
+        let lot = lotSelect.value; 
+        if (!quantity || parseFloat(quantity) <= 0) { 
+            alert("Por favor, insira uma quantidade válida."); 
+            return; 
+        } 
+        
+        // MUDANÇA: Permite salvar se o lote for "(Sem Lote)" ou se o seletor estiver escondido
+        if (!lot && lot !== "(Sem Lote)") { 
+            alert("Por favor, selecione um lote."); 
+            return; 
+        } 
+        
+        let dataToSend; 
+        if (lot === 'NOT_FOUND') { 
+            const manualLot = manualLotInput.value.trim(); 
+            const manualExpDate = manualExpDateInput.value; 
+            if (!manualLot) { 
+                alert("Por favor, insira o número do lote manual."); 
+                return; 
+            } 
+            if (isValidationRequired && !manualExpDate) { 
+                alert("Este produto exige o preenchimento da Data de Validade. Por favor, preencha o campo."); 
+                return; 
+            } 
+            let lotString = `(MANUAL) ${manualLot}`; 
+            if (manualExpDate) { lotString += ` | Val: ${manualExpDate}`; } 
+            dataToSend = { barcode: currentScannedBarcode, store: currentStore, operator: currentOperator, lot: lotString, quantity: quantity }; 
+        } else { 
+            // A lógica `(Sem Lote)` é tratada aqui. O valor de 'lot' já é "(Sem Lote)".
+            dataToSend = { barcode: currentScannedBarcode, store: currentStore, operator: currentOperator, lot: lot, quantity: quantity }; 
+        } 
+        saveData(dataToSend); 
+    });
     cancelRecountBtn.addEventListener('click', () => recountModal.classList.add('hidden'));
     saveRecountBtn.addEventListener('click', saveRecountData);
     recoverLastItemBtn.addEventListener('click', () => { if (lastScannedData) { openItemModal(lastScannedData); } else { alert('Nenhum item foi escaneado nesta sessão ainda.'); } });
@@ -288,7 +376,35 @@ document.addEventListener('DOMContentLoaded', function() {
     manualBarcode.addEventListener('keydown', function(event) { if (event.key === 'Enter') { event.preventDefault(); const barcode = manualBarcode.value.trim(); if (barcode) { manualEntryModal.classList.add('hidden'); fetchProductData(barcode); } } });
     manualEntryBtn.addEventListener('click', () => { manualBarcode.value = ''; manualProductName.value = ''; manualModalLot.value = ''; manualModalExpDate.value = ''; manualModalQuantity.value = ''; manualEntryModal.classList.remove('hidden'); manualBarcode.focus(); });
     cancelManualEntryBtn.addEventListener('click', () => { manualEntryModal.classList.add('hidden'); });
-    saveManualEntryBtn.addEventListener('click', () => { const barcode = manualBarcode.value.trim(); const productName = manualProductName.value.trim(); const lot = manualModalLot.value.trim(); const expDate = manualModalExpDate.value; const quantity = manualModalQuantity.value; if (!barcode || !productName || !quantity) { alert('Por favor, preencha pelo menos o Código de Barras, Nome do Produto e Quantidade.'); return; } let lotString = lot; if (expDate) { lotString += ` | Val: ${expDate}`; } const dataToSend = { barcode: barcode, store: currentStore, operator: currentOperator, lot: lotString, quantity: quantity, entryType: 'Manual' }; saveData(dataToSend); manualEntryModal.classList.add('hidden'); });
+    saveManualEntryBtn.addEventListener('click', () => { 
+        const barcode = manualBarcode.value.trim(); 
+        const productName = manualProductName.value.trim(); // <-- Pega o nome
+        const lot = manualModalLot.value.trim(); 
+        const expDate = manualModalExpDate.value; 
+        const quantity = manualModalQuantity.value; 
+        
+        if (!barcode || !productName || !quantity) { 
+            alert('Por favor, preencha pelo menos o Código de Barras, Nome do Produto e Quantidade.'); 
+            return; 
+        } 
+        
+        let lotString = lot; 
+        if (expDate) { lotString += ` | Val: ${expDate}`; } 
+        
+        // MUDANÇA: Adiciona "productName: productName" ao objeto
+        const dataToSend = { 
+            barcode: barcode, 
+            store: currentStore, 
+            operator: currentOperator, 
+            lot: lotString, 
+            quantity: quantity, 
+            entryType: 'Manual', 
+            productName: productName // <-- ENVIANDO O NOME
+        }; 
+        
+        saveData(dataToSend); 
+        manualEntryModal.classList.add('hidden'); 
+    });
     searchRecountInput.addEventListener('keyup', () => { const searchTerm = searchRecountInput.value.toLowerCase(); const filteredList = fullRecountList.filter(item => { return item.productName.toLowerCase().includes(searchTerm); }); renderRecountList(filteredList); });
     refreshRecountListBtn.addEventListener('click', () => { fetchRecountList(currentStore, currentRecountPhase); searchRecountInput.value = ''; });
 });
